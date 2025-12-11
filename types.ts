@@ -54,3 +54,20 @@ export interface User {
   role: 'admin' | 'editor' | 'viewer';
   isLoggedIn: boolean;
 }
+
+export interface BlogContextType {
+  posts: Post[];
+  settings: SiteSettings;
+  user: User;
+  theme: 'light' | 'dark';
+  savedImages: string[];
+  toggleTheme: () => void;
+  login: (password: string) => boolean;
+  logout: () => void;
+  addPost: (post: Post) => void;
+  updatePost: (post: Post) => void;
+  deletePost: (id: string) => void;
+  updateSettings: (settings: SiteSettings) => void;
+  restorePosts: (posts: Post[]) => void;
+  saveImageToLibrary: (url: string) => void;
+}

@@ -1,12 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { SeoData, Category } from "../types";
 
-// Safe access to environment variable
+// User provided API Key to resolve RPC errors
+const MANUAL_API_KEY = 'AIzaSyBRCSp4hpg1NulPI-AhKXGxwx8GP3dyWf4';
+
+// Safe access to environment variable or manual key
 const getApiKey = () => {
   try {
-    return process.env.API_KEY || '';
+    return MANUAL_API_KEY || process.env.API_KEY || '';
   } catch (e) {
-    return '';
+    return MANUAL_API_KEY;
   }
 };
 
@@ -56,7 +59,12 @@ export const generateSeoTags = async (postContent: string, postTitle: string): P
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as SeoData;
+      const parsed = JSON.parse(response.text);
+      return {
+          metaTitle: parsed.metaTitle || postTitle.substring(0, 60),
+          metaDescription: parsed.metaDescription || postContent.substring(0, 160),
+          keywords: parsed.keywords || []
+      };
     }
     
     throw new Error("No response text from Gemini");
@@ -73,6 +81,8 @@ export const generateSeoTags = async (postContent: string, postTitle: string): P
 };
 
 const generateBlogImage = async (prompt: string): Promise<string> => {
+  if (!apiKey) return `https://loremflickr.com/1280/720/nature?lock=${Date.now()}`;
+  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -98,6 +108,39 @@ const generateBlogImage = async (prompt: string): Promise<string> => {
     return `https://loremflickr.com/1280/720/nature?lock=${Date.now()}`;
   }
 };
+
+export const classifyPost = async (title: string, contentSnippet: string): Promise<Category> => {
+  if (!apiKey) return Category.SUSTAINABILITY;
+
+  try {
+    const prompt = `
+      Classify the following blog post into exactly one of these categories: 
+      "Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change".
+      
+      Title: ${title}
+      Content: ${contentSnippet.substring(0, 300)}...
+      
+      Return ONLY the category name.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    
+    const text = response.text?.trim() || '';
+    
+    // Simple matching to ensure it matches a valid enum
+    if (text.includes("Oceans")) return Category.OCEANS;
+    if (text.includes("Forests")) return Category.FORESTS;
+    if (text.includes("Wildlife")) return Category.WILDLIFE;
+    if (text.includes("Climate")) return Category.CLIMATE;
+    return Category.SUSTAINABILITY;
+  } catch (e) {
+    console.error("Classification failed", e);
+    return Category.SUSTAINABILITY;
+  }
+}
 
 export const generateFullPost = async (title: string): Promise<{
   subtitle: string;
@@ -128,40 +171,52 @@ export const generateFullPost = async (title: string): Promise<{
     Ensure the tone is professional yet passionate.
   `;
 
-  const textResponse = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: textPrompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          subtitle: { type: Type.STRING },
-          content: { type: Type.STRING },
-          category: { type: Type.STRING, enum: ["Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change"] },
-          tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          imageKeyword: { type: Type.STRING },
-          seo: {
+  try {
+    const textResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: textPrompt,
+        config: {
+        responseMimeType: "application/json",
+        responseSchema: {
             type: Type.OBJECT,
             properties: {
-              metaTitle: { type: Type.STRING },
-              metaDescription: { type: Type.STRING },
-              keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+            subtitle: { type: Type.STRING },
+            content: { type: Type.STRING },
+            category: { type: Type.STRING, enum: ["Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change"] },
+            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            imageKeyword: { type: Type.STRING },
+            seo: {
+                type: Type.OBJECT,
+                properties: {
+                metaTitle: { type: Type.STRING },
+                metaDescription: { type: Type.STRING },
+                keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+                }
             }
-          }
+            }
         }
-      }
+        }
+    });
+
+    if (!textResponse.text) {
+        throw new Error("Failed to generate post content text");
     }
-  });
 
-  if (!textResponse.text) {
-    throw new Error("Failed to generate post content text");
+    const data = JSON.parse(textResponse.text);
+
+    // Ensure SEO object exists even if model returns incomplete data
+    const sanitizedSeo = data.seo || { 
+        metaTitle: title, 
+        metaDescription: data.subtitle || 'A post about ' + title, 
+        keywords: [] 
+    };
+
+    // 2. Generate Image based on the keyword/description provided by the text model
+    const coverImage = await generateBlogImage(data.imageKeyword || title);
+
+    return { ...data, seo: sanitizedSeo, coverImage };
+  } catch (error) {
+    console.error("Full post generation failed:", error);
+    throw error;
   }
-
-  const data = JSON.parse(textResponse.text);
-
-  // 2. Generate Image based on the keyword/description provided by the text model
-  const coverImage = await generateBlogImage(data.imageKeyword || title);
-
-  return { ...data, coverImage };
 };

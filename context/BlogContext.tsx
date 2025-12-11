@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Post, SiteSettings, User, Category } from '../types';
+import { Post, SiteSettings, User, Category, BlogContextType } from '../types';
 
 // Placeholder Data
 const INITIAL_POSTS: Post[] = [
@@ -91,53 +91,76 @@ const INITIAL_SETTINGS: SiteSettings = {
   }
 };
 
-interface BlogContextType {
-  posts: Post[];
-  settings: SiteSettings;
-  user: User;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
-  login: (password: string) => boolean;
-  logout: () => void;
-  addPost: (post: Post) => void;
-  updatePost: (post: Post) => void;
-  deletePost: (id: string) => void;
-  updateSettings: (settings: SiteSettings) => void;
-}
+const INITIAL_IMAGES = [
+  "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1511497584788-876760111969?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1501854140884-074cf2b2c3af?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1426604966848-d7adac402bff?ixlib=rb-4.0.3&w=1000&q=80",
+];
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
 export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
-  const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
-  const [user, setUser] = useState<User>({ username: 'guest', role: 'viewer', isLoggedIn: false });
+  // Lazy initialization to prevent overwriting local storage on mount
+  const [posts, setPosts] = useState<Post[]>(() => {
+    try {
+      const stored = localStorage.getItem('nu_posts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Robust sanitization to ensure required fields (like seo) exist
+        return Array.isArray(parsed) ? parsed.map((p: any) => ({
+          ...p,
+          seo: p.seo || { metaTitle: p.title || '', metaDescription: '', keywords: [] },
+          tags: p.tags || [],
+          comments: p.comments || []
+        })) : INITIAL_POSTS;
+      }
+      return INITIAL_POSTS;
+    } catch (e) {
+      console.error("Failed to load posts", e);
+      return INITIAL_POSTS;
+    }
+  });
+
+  const [settings, setSettings] = useState<SiteSettings>(() => {
+    try {
+      const stored = localStorage.getItem('nu_settings');
+      return stored ? { ...INITIAL_SETTINGS, ...JSON.parse(stored) } : INITIAL_SETTINGS;
+    } catch (e) {
+      return INITIAL_SETTINGS;
+    }
+  });
+
+  const [savedImages, setSavedImages] = useState<string[]>(() => {
+    try {
+        const stored = localStorage.getItem('nu_images');
+        const parsed = stored ? JSON.parse(stored) : [];
+        // Use set to ensure uniqueness and merge with initial images
+        return Array.from(new Set([...INITIAL_IMAGES, ...parsed]));
+    } catch (e) {
+        return INITIAL_IMAGES;
+    }
+  });
+
+  const [user, setUser] = useState<User>(() => {
+    const storedAuth = localStorage.getItem('nu_auth');
+    return storedAuth === 'true' 
+      ? { username: 'Admin', role: 'admin', isLoggedIn: true }
+      : { username: 'guest', role: 'viewer', isLoggedIn: false };
+  });
+
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Load from LocalStorage on mount
+  // Check system preference for dark mode once
   useEffect(() => {
-    const storedPosts = localStorage.getItem('nu_posts');
-    if (storedPosts) setPosts(JSON.parse(storedPosts));
-    
-    const storedSettings = localStorage.getItem('nu_settings');
-    if (storedSettings) {
-        // We merge with INITIAL_SETTINGS to ensure any new fields (like contactEmail) are added to old data
-        setSettings({ ...INITIAL_SETTINGS, ...JSON.parse(storedSettings) });
-    }
-
-    // Check auth session
-    const storedAuth = localStorage.getItem('nu_auth');
-    if (storedAuth === 'true') {
-        setUser({ username: 'Admin', role: 'admin', isLoggedIn: true });
-    }
-
-    // Check system preference for dark mode
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setTheme('dark');
-      document.documentElement.classList.add('dark');
     }
   }, []);
 
-  // Save to LocalStorage on change
+  // Save to LocalStorage whenever state changes
   useEffect(() => {
     localStorage.setItem('nu_posts', JSON.stringify(posts));
   }, [posts]);
@@ -145,6 +168,10 @@ export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     localStorage.setItem('nu_settings', JSON.stringify(settings));
   }, [settings]);
+
+  useEffect(() => {
+    localStorage.setItem('nu_images', JSON.stringify(savedImages));
+  }, [savedImages]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -173,26 +200,45 @@ export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addPost = (post: Post) => {
-    setPosts([post, ...posts]);
+    setPosts(prev => [post, ...prev]);
   };
 
   const updatePost = (updatedPost: Post) => {
-    setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
   };
 
   const deletePost = (id: string) => {
-    setPosts(posts.filter(p => p.id !== id));
+    setPosts(prev => prev.filter(p => p.id !== id));
   };
 
   const updateSettings = (newSettings: SiteSettings) => {
     setSettings(newSettings);
   };
+  
+  const restorePosts = (restoredPosts: Post[]) => {
+    const sanitized = restoredPosts.map((p: any) => ({
+      ...p,
+      seo: p.seo || { metaTitle: p.title || '', metaDescription: '', keywords: [] },
+      tags: p.tags || [],
+      comments: p.comments || []
+    }));
+    setPosts(sanitized);
+  };
+
+  const saveImageToLibrary = (url: string) => {
+    if (!url) return;
+    setSavedImages(prev => {
+        // Prevent duplicates
+        if (prev.includes(url)) return prev;
+        return [url, ...prev];
+    });
+  };
 
   return (
     <BlogContext.Provider value={{ 
-      posts, settings, user, theme, 
+      posts, settings, user, theme, savedImages,
       toggleTheme, login, logout, 
-      addPost, updatePost, deletePost, updateSettings 
+      addPost, updatePost, deletePost, updateSettings, restorePosts, saveImageToLibrary
     }}>
       {children}
     </BlogContext.Provider>

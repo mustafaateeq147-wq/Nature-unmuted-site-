@@ -37,7 +37,9 @@ const PostCard: React.FC<{ post: any }> = ({ post }) => (
 
 export const Home: React.FC = () => {
   const { posts, settings } = useBlog();
-  const featuredPosts = posts.filter(p => p.isPublished).slice(0, 3);
+  const featuredPosts = posts
+    .filter(p => p.isPublished && new Date(p.date) <= new Date())
+    .slice(0, 3);
 
   return (
     <>
@@ -111,9 +113,10 @@ export const BlogList: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const filteredPosts = posts.filter(post => {
+    const isVisible = post.isPublished && new Date(post.date) <= new Date();
     const matchesFilter = filter ? post.category === filter : true;
     const matchesSearch = post.title.toLowerCase().includes(search.toLowerCase()) || post.content.toLowerCase().includes(search.toLowerCase());
-    return post.isPublished && matchesFilter && matchesSearch;
+    return isVisible && matchesFilter && matchesSearch;
   });
 
   return (
@@ -163,10 +166,16 @@ export const BlogList: React.FC = () => {
 
 export const BlogPost: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { posts } = useBlog();
+  const { posts, user } = useBlog();
   const post = posts.find(p => p.id === id);
 
   if (!post) return <div className="text-center py-20">Post not found</div>;
+
+  // Protect future scheduled posts from direct access unless admin
+  const isFuture = new Date(post.date) > new Date();
+  if ((!post.isPublished || isFuture) && !user.isLoggedIn) {
+     return <div className="text-center py-20">Post not found or unavailable.</div>;
+  }
 
   return (
     <article className="bg-white dark:bg-stone-900 min-h-screen pb-20">

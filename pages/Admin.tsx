@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { Button, Card, Input, TextArea, RichTextEditor, ImagePicker, MarkdownRenderer } from '../components/UI';
 import { Category, Post, SiteSettings } from '../types';
-import { generateSeoTags, generateFullPost } from '../services/geminiService';
+import { generateSeoTags, generateFullPost, classifyPost } from '../services/geminiService';
 import { 
   Plus, Edit, Trash2, Settings, BarChart3, Save, 
-  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, Wand2, Loader2
+  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, Wand2, Loader2, Download, Upload as UploadIcon, Clock
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -119,28 +119,35 @@ export const AdminDashboard: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
-            {posts.map(post => (
-              <tr key={post.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
-                <td className="p-4">
-                    <p className="font-medium text-stone-800 dark:text-white">{post.title}</p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 md:hidden">{post.category} • {new Date(post.date).toLocaleDateString()}</p>
-                </td>
-                <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell">
-                  <span className="px-2 py-1 rounded-full bg-nature-100 dark:bg-nature-900 text-nature-700 dark:text-nature-300 text-xs font-bold">
-                    {post.category}
-                  </span>
-                </td>
-                <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell text-sm">{new Date(post.date).toLocaleDateString()}</td>
-                <td className="p-4 text-right space-x-2">
-                  <Button variant="ghost" className="p-2 inline-flex h-8 w-8" onClick={() => navigate(`/admin/editor/${post.id}`)} title="Edit">
-                    <Edit size={16} />
-                  </Button>
-                  <Button variant="ghost" className="p-2 inline-flex h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deletePost(post.id)} title="Delete">
-                    <Trash2 size={16} />
-                  </Button>
-                </td>
-              </tr>
-            ))}
+            {posts.map(post => {
+              const isScheduled = new Date(post.date) > new Date();
+              return (
+                <tr key={post.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
+                  <td className="p-4">
+                      <p className="font-medium text-stone-800 dark:text-white">{post.title}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 md:hidden">{post.category} • {new Date(post.date).toLocaleDateString()}</p>
+                  </td>
+                  <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell">
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold flex items-center w-fit gap-1 ${isScheduled ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-nature-100 text-nature-700 dark:bg-nature-900 dark:text-nature-300'}`}>
+                      {isScheduled && <Clock size={12} />}
+                      {isScheduled ? 'Scheduled' : post.category}
+                    </span>
+                  </td>
+                  <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell text-sm">
+                    {new Date(post.date).toLocaleDateString()}
+                    {isScheduled && <div className="text-xs text-amber-600 dark:text-amber-500">{new Date(post.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>}
+                  </td>
+                  <td className="p-4 text-right space-x-2">
+                    <Button variant="ghost" className="p-2 inline-flex h-8 w-8" onClick={() => navigate(`/admin/editor/${post.id}`)} title="Edit">
+                      <Edit size={16} />
+                    </Button>
+                    <Button variant="ghost" className="p-2 inline-flex h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deletePost(post.id)} title="Delete">
+                      <Trash2 size={16} />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -148,9 +155,33 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
+const GoogleSnippetPreview: React.FC<{ title: string; description: string; urlSlug?: string }> = ({ title, description, urlSlug }) => {
+  const displayUrl = `natureunmuted.com › blog › ${urlSlug || 'post'}`;
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-200 font-sans max-w-[600px] select-none text-left">
+       <div className="flex items-center gap-2 mb-1">
+          <div className="bg-stone-100 rounded-full p-1 border border-stone-200 flex items-center justify-center w-7 h-7">
+             <Globe size={14} className="text-stone-500"/>
+          </div>
+          <div className="flex flex-col leading-none justify-center">
+             <span className="text-[14px] text-[#202124] font-normal">Nature Unmuted</span>
+             <span className="text-[12px] text-[#4d5156] mt-0.5">{displayUrl}</span>
+          </div>
+       </div>
+       <h3 className="text-[#1a0dab] text-xl font-medium cursor-pointer hover:underline truncate mt-1">
+          {title || "Post Title Will Appear Here"}
+       </h3>
+       <div className="text-[#4d5156] text-sm leading-snug line-clamp-2 mt-1">
+          <span className="text-stone-500 text-xs mr-2">{new Date().toDateString().split(' ').slice(1,3).join(' ')} — </span>
+          {description || "Meta description will appear here in search results. It summarizes the post content for users and helps improve click-through rates from search engines."}
+       </div>
+    </div>
+  );
+};
+
 export const PostEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { posts, addPost, updatePost } = useBlog();
+  const { posts, addPost, updatePost, savedImages, saveImageToLibrary } = useBlog();
   const navigate = useNavigate();
   const isEditing = !!id;
 
@@ -172,13 +203,21 @@ export const PostEditor: React.FC = () => {
 
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [isClassifying, setIsClassifying] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
   useEffect(() => {
     if (isEditing) {
       const existingPost = posts.find(p => p.id === id);
-      if (existingPost) setFormData(existingPost);
+      if (existingPost) {
+        // Ensure seo and other optional fields are populated to avoid crashes
+        setFormData({
+            ...existingPost,
+            seo: existingPost.seo || { metaTitle: existingPost.title, metaDescription: '', keywords: [] },
+            tags: existingPost.tags || []
+        });
+      }
     }
   }, [id, posts, isEditing]);
 
@@ -188,10 +227,22 @@ export const PostEditor: React.FC = () => {
 
   const handleSave = () => {
     if (!formData.title) return alert("Title is required");
+    
+    // Auto-save image to library when post is saved
+    if (formData.coverImage) {
+        saveImageToLibrary(formData.coverImage);
+    }
+
+    const postToSave = {
+        ...formData,
+        // Fallback for SEO to prevent undefined error if it somehow got lost
+        seo: formData.seo || { metaTitle: formData.title, metaDescription: '', keywords: [] }
+    };
+    
     if (isEditing) {
-      updatePost(formData);
+      updatePost(postToSave);
     } else {
-      addPost(formData);
+      addPost(postToSave);
     }
     navigate('/admin');
   };
@@ -211,6 +262,22 @@ export const PostEditor: React.FC = () => {
       setIsGeneratingSeo(false);
     }
   };
+  
+  const handleAutoClassify = async () => {
+      if(!formData.title) {
+          alert("Enter a title first.");
+          return;
+      }
+      setIsClassifying(true);
+      try {
+          const category = await classifyPost(formData.title, formData.content || formData.subtitle);
+          setFormData(prev => ({ ...prev, category }));
+      } catch(e) {
+          console.error(e);
+      } finally {
+          setIsClassifying(false);
+      }
+  };
 
   const handleAutoGenerate = async () => {
     if (!formData.title) {
@@ -227,14 +294,20 @@ export const PostEditor: React.FC = () => {
             content: generatedData.content,
             category: generatedData.category,
             tags: generatedData.tags,
-            seo: generatedData.seo,
-            coverImage: generatedData.coverImage // Uses the AI generated base64 image
+            // Ensure SEO exists, fallback to safe default if API returns incomplete data
+            seo: generatedData.seo || { metaTitle: prev.title, metaDescription: generatedData.subtitle, keywords: [] },
+            coverImage: generatedData.coverImage
         }));
         
-        setViewMode('preview'); // Switch to preview to show off the magic
+        // Auto-save generated image
+        if (generatedData.coverImage) {
+            saveImageToLibrary(generatedData.coverImage);
+        }
+        
+        setViewMode('preview');
     } catch (error) {
         console.error(error);
-        alert("Failed to auto-generate post. Please check your API key.");
+        alert("Failed to auto-generate. This might be a network issue. Please check your connection and API Key.");
     } finally {
         setIsAutoGenerating(false);
     }
@@ -246,6 +319,26 @@ export const PostEditor: React.FC = () => {
       setTagInput('');
     }
   };
+
+  // Helper to handle local time for datetime-local input
+  const formatDateForInput = (isoString: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const localValue = e.target.value;
+      if (!localValue) return;
+      const date = new Date(localValue);
+      setFormData({ ...formData, date: date.toISOString() });
+  };
+
+  // Safe access to SEO data for rendering, ensuring it's never undefined
+  const seoData = formData.seo || { metaTitle: '', metaDescription: '', keywords: [] };
+  const urlSlug = formData.title ? formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : 'new-post';
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -270,7 +363,7 @@ export const PostEditor: React.FC = () => {
                 </button>
             </div>
             <Button onClick={handleSave} className="bg-nature-600 hover:bg-nature-700 text-white">
-            <Save size={18} /> Publish Post
+            <Save size={18} /> {new Date(formData.date) > new Date() ? 'Schedule Post' : 'Publish Post'}
             </Button>
          </div>
       </div>
@@ -297,12 +390,12 @@ export const PostEditor: React.FC = () => {
                 
                 {/* Preview Metadata */}
                 <div className="mt-12 pt-8 border-t border-stone-200 dark:border-stone-700">
-                    <h4 className="font-bold mb-2 text-stone-500 uppercase text-sm">SEO Preview</h4>
-                    <div className="bg-stone-50 dark:bg-stone-800 p-4 rounded-lg">
-                        <p className="text-blue-600 text-lg font-medium hover:underline cursor-pointer mb-1">{formData.seo.metaTitle || formData.title}</p>
-                        <p className="text-green-700 text-sm mb-1">natureunmuted.com/post/...</p>
-                        <p className="text-stone-600 dark:text-stone-400 text-sm">{formData.seo.metaDescription || "No description generated."}</p>
-                    </div>
+                    <h4 className="font-bold mb-4 text-stone-500 uppercase text-sm">Search Engine Preview</h4>
+                    <GoogleSnippetPreview 
+                        title={seoData?.metaTitle || formData.title}
+                        description={seoData?.metaDescription}
+                        urlSlug={urlSlug}
+                    />
                 </div>
             </div>
         </div>
@@ -349,22 +442,36 @@ export const PostEditor: React.FC = () => {
             <Card>
                 <h3 className="font-bold mb-4 text-stone-700 dark:text-white">Publishing Details</h3>
                 <div className="flex flex-col gap-4">
+                
+                <Input 
+                   type="datetime-local"
+                   label="Publish Date & Time"
+                   value={formatDateForInput(formData.date)}
+                   onChange={handleDateChange}
+                />
+
                 <div className="flex flex-col gap-1">
                     <label className="text-sm font-semibold text-stone-600 dark:text-stone-300">Category</label>
-                    <select 
-                        name="category" 
-                        value={formData.category} 
-                        onChange={handleChange}
-                        className="px-4 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-nature-50"
-                    >
-                        {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    <div className="flex gap-2">
+                        <select 
+                            name="category" 
+                            value={formData.category} 
+                            onChange={handleChange}
+                            className="flex-grow px-4 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-nature-50"
+                        >
+                            {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <Button variant="secondary" onClick={handleAutoClassify} disabled={isClassifying} title="Auto-classify category based on title">
+                            {isClassifying ? <Loader2 className="animate-spin" size={16}/> : <Wand2 size={16}/>}
+                        </Button>
+                    </div>
                 </div>
                 
                 <ImagePicker 
                     label="Cover Image"
                     value={formData.coverImage}
                     onChange={(url) => setFormData({...formData, coverImage: url})}
+                    presets={savedImages}
                 />
 
                 <Input name="author" label="Author Name" value={formData.author} onChange={handleChange} />
@@ -384,18 +491,29 @@ export const PostEditor: React.FC = () => {
                     <Sparkles size={14} className="mr-1" /> Refresh SEO
                     </Button>
                 </div>
+                
+                {/* Google Preview Inside Card */}
+                <div className="mb-6 p-4 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-100 dark:border-stone-800">
+                   <label className="text-xs font-bold text-stone-500 uppercase block mb-3">Google Search Preview</label>
+                   <GoogleSnippetPreview 
+                      title={seoData?.metaTitle || formData.title}
+                      description={seoData?.metaDescription}
+                      urlSlug={urlSlug}
+                   />
+                </div>
+
                 <div className="space-y-4">
                     <Input 
                         label="Meta Title" 
-                        value={formData.seo.metaTitle} 
-                        onChange={(e) => setFormData({...formData, seo: {...formData.seo, metaTitle: e.target.value}})} 
+                        value={seoData?.metaTitle || ''} 
+                        onChange={(e) => setFormData({...formData, seo: {...seoData, metaTitle: e.target.value}})} 
                         placeholder="Optimized title for search engines"
                     />
                     <TextArea 
                         label="Meta Description" 
                         rows={3}
-                        value={formData.seo.metaDescription} 
-                        onChange={(e) => setFormData({...formData, seo: {...formData.seo, metaDescription: e.target.value}})} 
+                        value={seoData?.metaDescription || ''} 
+                        onChange={(e) => setFormData({...formData, seo: {...seoData, metaDescription: e.target.value}})} 
                         placeholder="Brief summary for search results"
                     />
                     <div>
@@ -411,7 +529,7 @@ export const PostEditor: React.FC = () => {
                         <Button onClick={addTag} type="button" variant="secondary" className="px-3 py-1">+</Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {formData.tags.map(tag => (
+                        {formData.tags?.map(tag => (
                             <span key={tag} className="text-xs bg-stone-100 dark:bg-stone-700 px-2 py-1 rounded flex items-center gap-1 border border-stone-200 dark:border-stone-600">
                                 {tag} <button onClick={() => setFormData({...formData, tags: formData.tags.filter(t => t !== tag)})} className="hover:text-red-500">&times;</button>
                             </span>
@@ -428,8 +546,9 @@ export const PostEditor: React.FC = () => {
 };
 
 export const SettingsPage: React.FC = () => {
-   const { settings, updateSettings } = useBlog();
+   const { settings, updateSettings, posts, restorePosts } = useBlog();
    const [localSettings, setLocalSettings] = useState<SiteSettings>(settings);
+   const fileInputRef = useRef<HTMLInputElement>(null);
 
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setLocalSettings({ ...localSettings, [e.target.name]: e.target.value });
@@ -438,6 +557,37 @@ export const SettingsPage: React.FC = () => {
    const handleSave = () => {
       updateSettings(localSettings);
       alert("Settings Saved!");
+   };
+
+   const handleDownloadBackup = () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(posts));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "nature_unmuted_backup.json");
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+   };
+
+   const handleRestoreBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+         try {
+            const restoredPosts = JSON.parse(event.target?.result as string);
+            if (Array.isArray(restoredPosts)) {
+               restorePosts(restoredPosts);
+               alert("Posts restored successfully!");
+            } else {
+               alert("Invalid backup file.");
+            }
+         } catch (error) {
+            alert("Error parsing backup file.");
+         }
+      };
+      reader.readAsText(file);
    };
 
    return (
@@ -461,6 +611,25 @@ export const SettingsPage: React.FC = () => {
             <Input name="footerText" label="Footer Copyright" value={localSettings.footerText} onChange={handleChange} />
             <Input name="contactEmail" label="Contact Email" value={localSettings.contactEmail} onChange={handleChange} />
             
+            <h3 className="text-xl font-bold border-b border-stone-200 dark:border-stone-700 pb-2 pt-4 text-stone-800 dark:text-white">Data Management</h3>
+            <div className="flex gap-4">
+               <Button onClick={handleDownloadBackup} variant="secondary">
+                  <Download size={16} /> Backup Posts
+               </Button>
+               <div className="relative">
+                  <Button onClick={() => fileInputRef.current?.click()} variant="secondary">
+                     <UploadIcon size={16} /> Restore Posts
+                  </Button>
+                  <input 
+                     type="file" 
+                     ref={fileInputRef} 
+                     onChange={handleRestoreBackup} 
+                     className="hidden" 
+                     accept=".json"
+                  />
+               </div>
+            </div>
+
             <Button onClick={handleSave} className="w-full mt-4">Save Changes</Button>
          </Card>
       </div>
