@@ -6,7 +6,7 @@ import { Category, Post, SiteSettings } from '../types';
 import { generateSeoTags, generateFullPost, classifyPost } from '../services/geminiService';
 import { 
   Plus, Edit, Trash2, Settings, BarChart3, Save, 
-  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, Wand2, Loader2, Download, Upload as UploadIcon, Clock
+  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, Wand2, Loader2, Download, Upload as UploadIcon, Clock, AlertTriangle, X
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -60,11 +60,24 @@ export const Login: React.FC = () => {
 };
 
 export const AdminDashboard: React.FC = () => {
-  const { posts, deletePost } = useBlog();
+  const { posts, deletePost, storageError, dismissStorageError } = useBlog();
   const navigate = useNavigate();
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {storageError && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 text-red-700 animate-fade-in">
+           <AlertTriangle className="flex-shrink-0 mt-0.5" size={20} />
+           <div className="flex-grow">
+             <p className="font-bold">Storage Limit Reached!</p>
+             <p className="text-sm mt-1">{storageError}</p>
+           </div>
+           <button onClick={dismissStorageError} className="p-1 hover:bg-red-100 rounded">
+             <X size={16} />
+           </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <div>
            <h1 className="text-3xl font-serif font-bold text-stone-800 dark:text-white">Dashboard</h1>

@@ -103,6 +103,25 @@ const INITIAL_IMAGES = [
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
 export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Safe Storage Saver
+  const [storageError, setStorageError] = useState<string | null>(null);
+
+  const saveToStorage = (key: string, value: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      // Only clear error if it was a specific quota error, otherwise keep it visible if needed, 
+      // but usually success means we can clear.
+      if (storageError) setStorageError(null);
+    } catch (e: any) {
+      console.error("Storage Save Failed:", e);
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        setStorageError("⚠️ Storage Full! Your changes cannot be saved. Please delete old posts or images.");
+      } else {
+        setStorageError("⚠️ Error saving data to local storage.");
+      }
+    }
+  };
+
   // Lazy initialization to prevent overwriting local storage on mount
   const [posts, setPosts] = useState<Post[]>(() => {
     try {
@@ -162,15 +181,15 @@ export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Save to LocalStorage whenever state changes
   useEffect(() => {
-    localStorage.setItem('nu_posts', JSON.stringify(posts));
+    saveToStorage('nu_posts', posts);
   }, [posts]);
 
   useEffect(() => {
-    localStorage.setItem('nu_settings', JSON.stringify(settings));
+    saveToStorage('nu_settings', settings);
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem('nu_images', JSON.stringify(savedImages));
+    saveToStorage('nu_images', savedImages);
   }, [savedImages]);
 
   useEffect(() => {
@@ -234,11 +253,14 @@ export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  const dismissStorageError = () => setStorageError(null);
+
   return (
     <BlogContext.Provider value={{ 
-      posts, settings, user, theme, savedImages,
+      posts, settings, user, theme, savedImages, storageError,
       toggleTheme, login, logout, 
-      addPost, updatePost, deletePost, updateSettings, restorePosts, saveImageToLibrary
+      addPost, updatePost, deletePost, updateSettings, restorePosts, saveImageToLibrary,
+      dismissStorageError
     }}>
       {children}
     </BlogContext.Provider>

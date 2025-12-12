@@ -61,6 +61,7 @@ export interface BlogContextType {
   user: User;
   theme: 'light' | 'dark';
   savedImages: string[];
+  storageError: string | null;
   toggleTheme: () => void;
   login: (password: string) => boolean;
   logout: () => void;
@@ -70,4 +71,5 @@ export interface BlogContextType {
   updateSettings: (settings: SiteSettings) => void;
   restorePosts: (posts: Post[]) => void;
   saveImageToLibrary: (url: string) => void;
+  dismissStorageError: () => void;
 }

@@ -1,33 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { SeoData, Category } from "../types";
 
-// User provided API Key to resolve RPC errors
-const MANUAL_API_KEY = 'AIzaSyBRCSp4hpg1NulPI-AhKXGxwx8GP3dyWf4';
-
-// Safe access to environment variable or manual key
-const getApiKey = () => {
-  try {
-    return MANUAL_API_KEY || process.env.API_KEY || '';
-  } catch (e) {
-    return MANUAL_API_KEY;
-  }
-};
-
-const apiKey = getApiKey();
-
-// Initialize Gemini
-const ai = new GoogleGenAI({ apiKey });
+// Initialize Gemini with API key from environment variables
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateSeoTags = async (postContent: string, postTitle: string): Promise<SeoData> => {
-  if (!apiKey) {
-    console.warn("No API Key provided for Gemini.");
-    return {
-      metaTitle: postTitle,
-      metaDescription: "Content about " + postTitle,
-      keywords: ["nature", "blog"]
-    };
-  }
-
   try {
     const prompt = `
       Analyze the following blog post content and title. 
@@ -81,8 +58,6 @@ export const generateSeoTags = async (postContent: string, postTitle: string): P
 };
 
 const generateBlogImage = async (prompt: string): Promise<string> => {
-  if (!apiKey) return `https://loremflickr.com/1280/720/nature?lock=${Date.now()}`;
-  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -110,8 +85,6 @@ const generateBlogImage = async (prompt: string): Promise<string> => {
 };
 
 export const classifyPost = async (title: string, contentSnippet: string): Promise<Category> => {
-  if (!apiKey) return Category.SUSTAINABILITY;
-
   try {
     const prompt = `
       Classify the following blog post into exactly one of these categories: 
@@ -151,10 +124,6 @@ export const generateFullPost = async (title: string): Promise<{
   imageKeyword: string;
   coverImage: string;
 }> => {
-  if (!apiKey) {
-    throw new Error("API Key is missing. Cannot generate content.");
-  }
-
   // 1. Generate Text Content
   const textPrompt = `
     You are an expert environmental blog writer for "Nature Unmuted".
