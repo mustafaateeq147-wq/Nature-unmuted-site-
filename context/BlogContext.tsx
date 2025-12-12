@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Post, SiteSettings, User, Category, BlogContextType } from '../types';
+import { Post, SiteSettings, User, Category } from '../types';
 
 // Placeholder Data
 const INITIAL_POSTS: Post[] = [
@@ -80,10 +80,9 @@ Synthetic clothes shed microplastics when washed. Opt for cotton, wool, or linen
 const INITIAL_SETTINGS: SiteSettings = {
   siteName: 'Nature Unmuted',
   tagline: 'Voices for a Greener Future',
-  logoUrl: 'https://ibb.co/Kzqs905s',
+  logoUrl: 'https://cdn-icons-png.flaticon.com/512/3209/3209971.png', // Placeholder leaf icon
   footerText: '© 2024 Nature Unmuted. Preserving our planet one post at a time.',
   primaryColor: '#36a869',
-  contactEmail: 'mustafaateeq147@gmail.com',
   socialLinks: {
     facebook: '#',
     twitter: '#',
@@ -91,106 +90,57 @@ const INITIAL_SETTINGS: SiteSettings = {
   }
 };
 
-const INITIAL_IMAGES = [
-  "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?ixlib=rb-4.0.3&w=1000&q=80",
-  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&w=1000&q=80",
-  "https://images.unsplash.com/photo-1511497584788-876760111969?ixlib=rb-4.0.3&w=1000&q=80",
-  "https://images.unsplash.com/photo-1501854140884-074cf2b2c3af?ixlib=rb-4.0.3&w=1000&q=80",
-  "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?ixlib=rb-4.0.3&w=1000&q=80",
-  "https://images.unsplash.com/photo-1426604966848-d7adac402bff?ixlib=rb-4.0.3&w=1000&q=80",
-];
+interface BlogContextType {
+  posts: Post[];
+  settings: SiteSettings;
+  user: User;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
+  login: (password: string) => boolean;
+  logout: () => void;
+  addPost: (post: Post) => void;
+  updatePost: (post: Post) => void;
+  deletePost: (id: string) => void;
+  updateSettings: (settings: SiteSettings) => void;
+}
 
 const BlogContext = createContext<BlogContextType | undefined>(undefined);
 
 export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Safe Storage Saver
-  const [storageError, setStorageError] = useState<string | null>(null);
-
-  const saveToStorage = (key: string, value: any) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      // Only clear error if it was a specific quota error, otherwise keep it visible if needed, 
-      // but usually success means we can clear.
-      if (storageError) setStorageError(null);
-    } catch (e: any) {
-      console.error("Storage Save Failed:", e);
-      if (e.name === 'QuotaExceededError' || e.code === 22) {
-        setStorageError("⚠️ Storage Full! Your changes cannot be saved. Please delete old posts or images.");
-      } else {
-        setStorageError("⚠️ Error saving data to local storage.");
-      }
-    }
-  };
-
-  // Lazy initialization to prevent overwriting local storage on mount
-  const [posts, setPosts] = useState<Post[]>(() => {
-    try {
-      const stored = localStorage.getItem('nu_posts');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Robust sanitization to ensure required fields (like seo) exist
-        return Array.isArray(parsed) ? parsed.map((p: any) => ({
-          ...p,
-          seo: p.seo || { metaTitle: p.title || '', metaDescription: '', keywords: [] },
-          tags: p.tags || [],
-          comments: p.comments || []
-        })) : INITIAL_POSTS;
-      }
-      return INITIAL_POSTS;
-    } catch (e) {
-      console.error("Failed to load posts", e);
-      return INITIAL_POSTS;
-    }
-  });
-
-  const [settings, setSettings] = useState<SiteSettings>(() => {
-    try {
-      const stored = localStorage.getItem('nu_settings');
-      return stored ? { ...INITIAL_SETTINGS, ...JSON.parse(stored) } : INITIAL_SETTINGS;
-    } catch (e) {
-      return INITIAL_SETTINGS;
-    }
-  });
-
-  const [savedImages, setSavedImages] = useState<string[]>(() => {
-    try {
-        const stored = localStorage.getItem('nu_images');
-        const parsed = stored ? JSON.parse(stored) : [];
-        // Use set to ensure uniqueness and merge with initial images
-        return Array.from(new Set([...INITIAL_IMAGES, ...parsed]));
-    } catch (e) {
-        return INITIAL_IMAGES;
-    }
-  });
-
-  const [user, setUser] = useState<User>(() => {
-    const storedAuth = localStorage.getItem('nu_auth');
-    return storedAuth === 'true' 
-      ? { username: 'Admin', role: 'admin', isLoggedIn: true }
-      : { username: 'guest', role: 'viewer', isLoggedIn: false };
-  });
-
+  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
+  const [user, setUser] = useState<User>({ username: 'guest', role: 'viewer', isLoggedIn: false });
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Check system preference for dark mode once
+  // Load from LocalStorage on mount
   useEffect(() => {
+    const storedPosts = localStorage.getItem('nu_posts');
+    if (storedPosts) setPosts(JSON.parse(storedPosts));
+    
+    const storedSettings = localStorage.getItem('nu_settings');
+    if (storedSettings) setSettings(JSON.parse(storedSettings));
+
+    // Check auth session
+    const storedAuth = localStorage.getItem('nu_auth');
+    if (storedAuth === 'true') {
+        setUser({ username: 'Admin', role: 'admin', isLoggedIn: true });
+    }
+
+    // Check system preference for dark mode
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setTheme('dark');
+      document.documentElement.classList.add('dark');
     }
   }, []);
 
-  // Save to LocalStorage whenever state changes
+  // Save to LocalStorage on change
   useEffect(() => {
-    saveToStorage('nu_posts', posts);
+    localStorage.setItem('nu_posts', JSON.stringify(posts));
   }, [posts]);
 
   useEffect(() => {
-    saveToStorage('nu_settings', settings);
+    localStorage.setItem('nu_settings', JSON.stringify(settings));
   }, [settings]);
-
-  useEffect(() => {
-    saveToStorage('nu_images', savedImages);
-  }, [savedImages]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -219,48 +169,26 @@ export const BlogProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addPost = (post: Post) => {
-    setPosts(prev => [post, ...prev]);
+    setPosts([post, ...posts]);
   };
 
   const updatePost = (updatedPost: Post) => {
-    setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+    setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
   };
 
   const deletePost = (id: string) => {
-    setPosts(prev => prev.filter(p => p.id !== id));
+    setPosts(posts.filter(p => p.id !== id));
   };
 
   const updateSettings = (newSettings: SiteSettings) => {
     setSettings(newSettings);
   };
-  
-  const restorePosts = (restoredPosts: Post[]) => {
-    const sanitized = restoredPosts.map((p: any) => ({
-      ...p,
-      seo: p.seo || { metaTitle: p.title || '', metaDescription: '', keywords: [] },
-      tags: p.tags || [],
-      comments: p.comments || []
-    }));
-    setPosts(sanitized);
-  };
-
-  const saveImageToLibrary = (url: string) => {
-    if (!url) return;
-    setSavedImages(prev => {
-        // Prevent duplicates
-        if (prev.includes(url)) return prev;
-        return [url, ...prev];
-    });
-  };
-
-  const dismissStorageError = () => setStorageError(null);
 
   return (
     <BlogContext.Provider value={{ 
-      posts, settings, user, theme, savedImages, storageError,
+      posts, settings, user, theme, 
       toggleTheme, login, logout, 
-      addPost, updatePost, deletePost, updateSettings, restorePosts, saveImageToLibrary,
-      dismissStorageError
+      addPost, updatePost, deletePost, updateSettings 
     }}>
       {children}
     </BlogContext.Provider>

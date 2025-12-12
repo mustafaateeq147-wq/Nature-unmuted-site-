@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { Button, Card, Input, TextArea, MarkdownRenderer } from '../components/UI';
-import { Calendar, User, Tag, Share2, MapPin, Mail, ArrowRight, Search, Check } from 'lucide-react';
+import { Calendar, User, Tag, Share2, MapPin, Mail, ArrowRight, Search } from 'lucide-react';
 import { Category } from '../types';
 
 // Components for smaller parts
@@ -37,9 +37,7 @@ const PostCard: React.FC<{ post: any }> = ({ post }) => (
 
 export const Home: React.FC = () => {
   const { posts, settings } = useBlog();
-  const featuredPosts = posts
-    .filter(p => p.isPublished && new Date(p.date) <= new Date())
-    .slice(0, 3);
+  const featuredPosts = posts.filter(p => p.isPublished).slice(0, 3);
 
   return (
     <>
@@ -113,10 +111,9 @@ export const BlogList: React.FC = () => {
   const [search, setSearch] = useState('');
 
   const filteredPosts = posts.filter(post => {
-    const isVisible = post.isPublished && new Date(post.date) <= new Date();
     const matchesFilter = filter ? post.category === filter : true;
     const matchesSearch = post.title.toLowerCase().includes(search.toLowerCase()) || post.content.toLowerCase().includes(search.toLowerCase());
-    return isVisible && matchesFilter && matchesSearch;
+    return post.isPublished && matchesFilter && matchesSearch;
   });
 
   return (
@@ -166,16 +163,10 @@ export const BlogList: React.FC = () => {
 
 export const BlogPost: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { posts, user } = useBlog();
+  const { posts } = useBlog();
   const post = posts.find(p => p.id === id);
 
   if (!post) return <div className="text-center py-20">Post not found</div>;
-
-  // Protect future scheduled posts from direct access unless admin
-  const isFuture = new Date(post.date) > new Date();
-  if ((!post.isPublished || isFuture) && !user.isLoggedIn) {
-     return <div className="text-center py-20">Post not found or unavailable.</div>;
-  }
 
   return (
     <article className="bg-white dark:bg-stone-900 min-h-screen pb-20">
@@ -278,52 +269,18 @@ export const About: React.FC = () => (
       </div>
       
       <div className="mt-16 flex flex-col md:flex-row items-center gap-8 bg-stone-100 dark:bg-stone-800 p-8 rounded-2xl">
-         {/* Placeholder image: Please replace with your uploaded image URL */}
-         <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Engineer Mustafa Ateeq" className="w-32 h-32 rounded-full object-cover shadow-lg" />
+         <img src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80" alt="Founder" className="w-32 h-32 rounded-full object-cover" />
          <div>
             <h3 className="text-xl font-bold font-serif mb-2 text-stone-800 dark:text-white">Meet the Founder</h3>
-            <p className="text-stone-600 dark:text-stone-300 italic mb-4">Engineer Mustafa Ateeq</p>
-            <p className="text-stone-700 dark:text-stone-200">
-               Engineer Mustafa Ateeq founded Nature Unmuted to bridge the gap between engineering solutions and environmental preservation. With a vision for a smarter, greener future, he advocates for sustainable technology and ecological awareness.
-            </p>
+            <p className="text-stone-600 dark:text-stone-300 italic mb-4">Alex Greenriver</p>
+            <p className="text-stone-700 dark:text-stone-200">An ecologist turned writer, Alex started Nature Unmuted to bridge the gap between scientific research and public awareness.</p>
          </div>
       </div>
     </div>
   </div>
 );
 
-export const Contact: React.FC = () => {
-  const { settings } = useBlog();
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setStatus('submitting');
-    
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-
-    try {
-        const response = await fetch("https://formspree.io/f/mqarbggq", {
-            method: "POST",
-            body: formData,
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (response.ok) {
-            setStatus('success');
-            form.reset();
-        } else {
-            setStatus('error');
-        }
-    } catch (error) {
-        setStatus('error');
-    }
-  };
-  
-  return (
+export const Contact: React.FC = () => (
   <div className="py-20 container mx-auto px-4">
     <div className="grid md:grid-cols-2 gap-12 max-w-6xl mx-auto">
       <div>
@@ -337,7 +294,7 @@ export const Contact: React.FC = () => {
             </div>
             <div>
               <p className="font-bold text-stone-800 dark:text-white">Email Us</p>
-              <p className="text-stone-600 dark:text-stone-400">{settings.contactEmail || 'hello@natureunmuted.com'}</p>
+              <p className="text-stone-600 dark:text-stone-400">hello@natureunmuted.com</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -359,63 +316,14 @@ export const Contact: React.FC = () => {
       </div>
 
       <Card className="p-8">
-        {status === 'success' ? (
-             <div className="text-center py-8">
-                 <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600 dark:text-green-400">
-                     <Check size={32} />
-                 </div>
-                 <h3 className="text-2xl font-bold text-stone-800 dark:text-white mb-2">Message Sent!</h3>
-                 <p className="text-stone-600 dark:text-stone-300 mb-6">Thank you for contacting us. We will get back to you shortly.</p>
-                 <Button onClick={() => setStatus('idle')} variant="secondary">Send Another Message</Button>
-             </div>
-        ) : (
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <Input name="name" label="Name" placeholder="Your Name" required />
-              <Input name="email" label="Email" type="email" placeholder="Your Email" required />
-              <Input name="subject" label="Subject" placeholder="Subject" />
-              <TextArea name="message" label="Message" rows={5} placeholder="How can we help?" required />
-              {status === 'error' && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
-                      Something went wrong. Please try again.
-                  </div>
-              )}
-              <Button type="submit" className="w-full" isLoading={status === 'submitting'}>
-                  Send Message
-              </Button>
-            </form>
-        )}
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert("Message sent! (Mock)"); }}>
+          <Input label="Name" placeholder="Your Name" required />
+          <Input label="Email" type="email" placeholder="Your Email" required />
+          <Input label="Subject" placeholder="Subject" />
+          <TextArea label="Message" rows={5} placeholder="How can we help?" required />
+          <Button type="submit" className="w-full">Send Message</Button>
+        </form>
       </Card>
     </div>
   </div>
 );
-};
-
-export const PrivacyPolicy: React.FC = () => {
-    const { settings } = useBlog();
-    return (
-        <div className="py-20 container mx-auto px-4">
-            <div className="max-w-4xl mx-auto bg-white dark:bg-stone-800 p-8 md:p-12 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700">
-                <h1 className="text-4xl font-serif font-bold text-stone-800 dark:text-white mb-8">Privacy Policy</h1>
-                <div className="prose prose-lg dark:prose-invert prose-stone max-w-none">
-                    <p>Last Updated: {new Date().toLocaleDateString()}</p>
-                    <p>At {settings.siteName}, accessible from natureunmuted.com, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by {settings.siteName} and how we use it.</p>
-                    
-                    <h3>Information We Collect</h3>
-                    <p>We collect information you provide directly to us, such as when you subscribe to our newsletter, leave a comment, or contact us via our form.</p>
-                    
-                    <h3>Log Files</h3>
-                    <p>{settings.siteName} follows a standard procedure of using log files. These files log visitors when they visit websites. All hosting companies do this and a part of hosting services' analytics.</p>
-                    
-                    <h3>Cookies and Web Beacons</h3>
-                    <p>Like any other website, {settings.siteName} uses "cookies". These cookies are used to store information including visitors' preferences, and the pages on the website that the visitor accessed or visited.</p>
-                    
-                    <h3>Third Party Privacy Policies</h3>
-                    <p>{settings.siteName}'s Privacy Policy does not apply to other advertisers or websites. Thus, we are advising you to consult the respective Privacy Policies of these third-party ad servers for more detailed information.</p>
-                    
-                    <h3>Contact Us</h3>
-                    <p>If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at {settings.contactEmail || 'contact@natureunmuted.com'}.</p>
-                </div>
-            </div>
-        </div>
-    );
-}

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Loader2, Bold, Italic, Heading, List, Quote, Image as ImageIcon, Link as LinkIcon, X, Check, Upload, Clock } from 'lucide-react';
+import { Loader2, Bold, Italic, Heading, List, Quote, Image as ImageIcon, Link as LinkIcon, X, Check, Upload } from 'lucide-react';
 import { marked } from 'marked';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -59,7 +59,7 @@ export const Card: React.FC<{ children: React.ReactNode, className?: string }> =
 // --- Rich Text Editor Components ---
 
 export const MarkdownRenderer: React.FC<{ content: string, className?: string }> = ({ content, className = '' }) => {
-  const html = marked.parse(content || '') as string;
+  const html = marked.parse(content || '', { async: false }) as string;
   return (
     <div 
       className={`prose prose-lg dark:prose-invert prose-stone max-w-none prose-headings:font-serif prose-a:text-nature-600 ${className}`}
@@ -135,26 +135,22 @@ export const RichTextEditor: React.FC<{
 
 // --- Media Library Picker ---
 
+const SAMPLE_IMAGES = [
+  "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1511497584788-876760111969?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1501854140884-074cf2b2c3af?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?ixlib=rb-4.0.3&w=1000&q=80",
+  "https://images.unsplash.com/photo-1426604966848-d7adac402bff?ixlib=rb-4.0.3&w=1000&q=80",
+];
+
 export const ImagePicker: React.FC<{ 
   value: string, 
   onChange: (url: string) => void,
-  label?: string,
-  presets?: string[]
-}> = ({ value, onChange, label, presets }) => {
+  label?: string 
+}> = ({ value, onChange, label }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
-  
-  // Default sample images if presets are not provided or empty
-  const defaultImages = [
-    "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?ixlib=rb-4.0.3&w=1000&q=80",
-    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&w=1000&q=80",
-    "https://images.unsplash.com/photo-1511497584788-876760111969?ixlib=rb-4.0.3&w=1000&q=80",
-    "https://images.unsplash.com/photo-1501854140884-074cf2b2c3af?ixlib=rb-4.0.3&w=1000&q=80",
-    "https://images.unsplash.com/photo-1505144808419-1957a94ca61e?ixlib=rb-4.0.3&w=1000&q=80",
-    "https://images.unsplash.com/photo-1426604966848-d7adac402bff?ixlib=rb-4.0.3&w=1000&q=80",
-  ];
-
-  const imagesToShow = (presets && presets.length > 0) ? presets : defaultImages;
 
   return (
     <div className="mb-4">
@@ -182,7 +178,7 @@ export const ImagePicker: React.FC<{
       {/* Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <Card className="w-full max-w-3xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <Card className="w-full max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
             <div className="p-4 border-b border-stone-200 dark:border-stone-700 flex justify-between items-center bg-stone-50 dark:bg-stone-900">
               <h3 className="font-bold text-lg">Select Image</h3>
               <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-full"><X size={20}/></button>
@@ -190,17 +186,16 @@ export const ImagePicker: React.FC<{
             
             <div className="p-6 overflow-y-auto">
               <div className="mb-6">
-                 <h4 className="text-sm font-bold mb-3 text-stone-500 uppercase tracking-wider">Your Library</h4>
-                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {imagesToShow.map((img, idx) => (
+                 <h4 className="text-sm font-bold mb-2 text-stone-500 uppercase tracking-wider">Presets</h4>
+                 <div className="grid grid-cols-3 gap-2">
+                    {SAMPLE_IMAGES.map((img) => (
                       <button 
-                        key={idx} 
+                        key={img} 
                         type="button"
                         onClick={() => { onChange(img); setIsOpen(false); }}
-                        className="relative aspect-video rounded-lg overflow-hidden hover:opacity-80 ring-2 ring-transparent hover:ring-nature-500 transition-all bg-stone-100 dark:bg-stone-900 group"
+                        className="relative aspect-video rounded-lg overflow-hidden hover:opacity-80 ring-2 ring-transparent hover:ring-nature-500 transition-all"
                       >
-                        <img src={img} alt="Preset" className="w-full h-full object-cover" loading="lazy" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                        <img src={img} alt="Preset" className="w-full h-full object-cover" />
                       </button>
                     ))}
                  </div>

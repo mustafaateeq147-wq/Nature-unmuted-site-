@@ -26,25 +26,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const linksToRender = isAdmin ? adminLinks : navLinks;
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    e.currentTarget.style.display = 'none';
-  };
-
   return (
     <div className="min-h-screen flex flex-col font-sans">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 shadow-sm transition-colors duration-300">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            {settings.logoUrl && (
-              <img 
-                src={settings.logoUrl} 
-                alt="Logo" 
-                className="h-12 w-12 md:h-14 md:w-14 object-contain filter drop-shadow-md group-hover:scale-105 transition-transform duration-300" 
-                onError={handleImageError}
-              />
-            )}
-            <span className="text-xl md:text-2xl font-bold font-serif text-stone-800 dark:text-nature-100 tracking-tight">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 group">
+            {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" className="h-8 w-8 object-contain opacity-90 group-hover:scale-110 transition-transform" />}
+            <span className="text-xl font-bold font-serif text-stone-800 dark:text-nature-100 tracking-tight">
               {isAdmin ? 'Admin Panel' : settings.siteName}
             </span>
           </Link>
@@ -98,7 +87,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
         {/* Mobile Nav */}
         {isMenuOpen && (
-          <div className="md:hidden absolute top-20 left-0 w-full bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 p-4 flex flex-col gap-4 shadow-lg animate-fade-in-down">
+          <div className="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 p-4 flex flex-col gap-4 shadow-lg animate-fade-in-down">
             {linksToRender.map((link) => (
               <Link 
                 key={link.path} 
@@ -132,23 +121,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       <footer className="bg-nature-900 text-nature-100 py-12 mt-12">
         <div className="container mx-auto px-4 grid md:grid-cols-3 gap-8">
           <div>
-            <div className="flex items-center gap-4 mb-6">
-               {settings.logoUrl && (
-                 <div className="bg-white/5 p-2 rounded-xl backdrop-blur-sm border border-white/10">
-                   <img 
-                      src={settings.logoUrl} 
-                      alt="Logo" 
-                      className="h-16 w-16 object-contain" 
-                      onError={handleImageError}
-                   />
-                 </div>
-               )}
-               <div>
-                 <h3 className="text-2xl font-serif font-bold text-white leading-none">{settings.siteName}</h3>
-                 <p className="text-nature-300 text-sm mt-1">EST. 2024</p>
-               </div>
+            <div className="flex items-center gap-2 mb-4">
+               {settings.logoUrl && <img src={settings.logoUrl} alt="Logo" className="h-6 w-6 brightness-200 grayscale" />}
+               <h3 className="text-xl font-serif font-bold text-white">{settings.siteName}</h3>
             </div>
-            <p className="text-nature-200/80 mb-6 max-w-xs">{settings.tagline}</p>
+            <p className="text-nature-200/80 mb-6">{settings.tagline}</p>
             <div className="flex gap-4">
               {/* Social Placeholders */}
               <a href="#" className="p-2 bg-nature-800 rounded-full hover:bg-nature-700 transition-colors">
@@ -162,28 +139,27 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
           </div>
           
-          <div className="md:pl-12">
-            <h4 className="text-white font-bold mb-6 text-lg">Explore</h4>
-            <ul className="space-y-3">
-              <li><Link to="/about" className="text-nature-200 hover:text-white transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-nature-400 rounded-full"></span> About Us</Link></li>
-              <li><Link to="/blog" className="text-nature-200 hover:text-white transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-nature-400 rounded-full"></span> Our Blog</Link></li>
-              <li><Link to="/contact" className="text-nature-200 hover:text-white transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-nature-400 rounded-full"></span> Contact</Link></li>
-              <li><Link to="/privacy" className="text-nature-200 hover:text-white transition-colors flex items-center gap-2"><span className="w-1.5 h-1.5 bg-nature-400 rounded-full"></span> Privacy Policy</Link></li>
+          <div>
+            <h4 className="text-white font-bold mb-4">Quick Links</h4>
+            <ul className="space-y-2">
+              <li><Link to="/about" className="text-nature-200 hover:text-white transition-colors">About Us</Link></li>
+              <li><Link to="/blog" className="text-nature-200 hover:text-white transition-colors">Blog</Link></li>
+              <li><Link to="/contact" className="text-nature-200 hover:text-white transition-colors">Contact</Link></li>
+              <li><Link to="/privacy" className="text-nature-200 hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-6 text-lg">Newsletter</h4>
-            <p className="text-nature-200 text-sm mb-4">Join our community for the latest environmental news and tips.</p>
-            <form className="flex flex-col gap-3" onSubmit={(e) => e.preventDefault()}>
-              <input type="email" placeholder="Your email address" className="bg-nature-800/50 border border-nature-700 text-white placeholder-nature-400 px-4 py-3 rounded-lg flex-grow focus:ring-2 focus:ring-nature-500 focus:outline-none focus:border-transparent transition-all" />
-              <button className="bg-nature-500 hover:bg-nature-400 text-white px-4 py-3 rounded-lg font-bold transition-colors shadow-lg shadow-nature-900/20">Subscribe Now</button>
+            <h4 className="text-white font-bold mb-4">Stay Connected</h4>
+            <p className="text-nature-200 text-sm mb-4">Join our newsletter for the latest environmental news.</p>
+            <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
+              <input type="email" placeholder="Your email" className="bg-nature-800 text-white placeholder-nature-400 px-4 py-2 rounded-lg flex-grow border-none focus:ring-2 focus:ring-nature-500" />
+              <button className="bg-nature-500 hover:bg-nature-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">Join</button>
             </form>
           </div>
         </div>
-        <div className="container mx-auto px-4 mt-12 pt-8 border-t border-nature-800 text-center text-nature-300 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
-          <p>{settings.footerText}</p>
-          <p className="opacity-60">Designed with ❤️ for Nature</p>
+        <div className="container mx-auto px-4 mt-12 pt-8 border-t border-nature-800 text-center text-nature-300 text-sm">
+          {settings.footerText}
         </div>
       </footer>
     </div>
