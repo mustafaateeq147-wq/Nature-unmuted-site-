@@ -3,10 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { Button, Card, Input, TextArea, RichTextEditor, ImagePicker, MarkdownRenderer } from '../components/UI';
 import { Category, Post, SiteSettings } from '../types';
-import { generateSeoTags } from '../services/geminiService';
+import { generateSeoTags, generateFullPost } from '../services/geminiService';
 import { 
   Plus, Edit, Trash2, Settings, BarChart3, Save, 
-  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool
+  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, X, Wand2
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -166,6 +166,10 @@ export const PostEditor: React.FC = () => {
   });
 
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isGeneratingPost, setIsGeneratingPost] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  
   const [tagInput, setTagInput] = useState('');
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
 
@@ -206,6 +210,31 @@ export const PostEditor: React.FC = () => {
     }
   };
 
+  const handleGenerateFullPost = async () => {
+    if (!aiTopic) return;
+    setIsGeneratingPost(true);
+    try {
+      const generatedData = await generateFullPost(aiTopic);
+      setFormData(prev => ({
+        ...prev,
+        title: generatedData.title,
+        subtitle: generatedData.subtitle,
+        content: generatedData.content,
+        category: generatedData.category as Category,
+        tags: generatedData.tags,
+        seo: generatedData.seo,
+        coverImage: generatedData.coverImage
+      }));
+      setShowAiModal(false);
+      setAiTopic('');
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate post. Please check your API key and try again.");
+    } finally {
+      setIsGeneratingPost(false);
+    }
+  };
+
   const addTag = () => {
     if (tagInput && !formData.tags.includes(tagInput)) {
       setFormData({ ...formData, tags: [...formData.tags, tagInput] });
@@ -214,13 +243,57 @@ export const PostEditor: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl relative">
+      {/* AI Generation Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <Card className="w-full max-w-lg p-0 overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-r from-nature-600 to-emerald-600 p-6 text-white">
+              <h3 className="text-xl font-bold font-serif flex items-center gap-2">
+                <Wand2 className="text-nature-200" /> AI Magic Generator
+              </h3>
+              <p className="text-nature-100 text-sm mt-1">
+                Enter a topic and let Gemini create a full blog post, including title, content, SEO tags, and a cover image.
+              </p>
+            </div>
+            <div className="p-6">
+              <Input 
+                label="What should this post be about?" 
+                placeholder="e.g., The importance of bees in urban ecosystems..."
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                autoFocus
+              />
+              <div className="flex justify-end gap-3 mt-4">
+                <Button variant="secondary" onClick={() => setShowAiModal(false)}>Cancel</Button>
+                <Button 
+                  onClick={handleGenerateFullPost} 
+                  isLoading={isGeneratingPost}
+                  disabled={!aiTopic}
+                  className="bg-nature-600 hover:bg-nature-700"
+                >
+                  {isGeneratingPost ? 'Creating Magic...' : 'Generate Post'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
          <div className="flex items-center gap-4">
             <Button variant="ghost" onClick={() => navigate('/admin')}><ArrowLeft size={18} /></Button>
             <h1 className="text-2xl font-bold font-serif dark:text-white">{isEditing ? 'Edit Post' : 'New Post'}</h1>
          </div>
          <div className="flex gap-2">
+            {!isEditing && (
+              <Button 
+                onClick={() => setShowAiModal(true)} 
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg"
+              >
+                 <Wand2 size={16} /> AI Generate
+              </Button>
+            )}
             <div className="bg-white dark:bg-stone-800 rounded-lg p-1 border border-stone-200 dark:border-stone-700 flex">
                 <button 
                   onClick={() => setViewMode('edit')}
