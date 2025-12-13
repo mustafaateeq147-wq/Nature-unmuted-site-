@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { Button, Card, Input, TextArea, MarkdownRenderer } from '../components/UI';
-import { Calendar, User, Tag, Share2, MapPin, Mail, ArrowRight, Search } from 'lucide-react';
+import { Calendar, User, Tag, Share2, MapPin, Mail, ArrowRight, Search, Edit } from 'lucide-react';
 import { Category } from '../types';
 
 // Components for smaller parts
@@ -163,7 +163,7 @@ export const BlogList: React.FC = () => {
 
 export const BlogPost: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { posts } = useBlog();
+  const { posts, user } = useBlog();
   const post = posts.find(p => p.id === id);
 
   if (!post) return <div className="text-center py-20">Post not found</div>;
@@ -175,7 +175,18 @@ export const BlogPost: React.FC = () => {
         <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-stone-900/80 to-transparent"></div>
         <div className="absolute bottom-0 left-0 w-full p-4 md:p-12 text-white">
-           <div className="container mx-auto">
+           <div className="container mx-auto relative">
+             {/* Admin Edit Button */}
+             {user.isLoggedIn && (
+               <div className="absolute right-0 top-0 -mt-16 md:mt-0 md:relative md:float-right">
+                  <Link to={`/admin/editor/${post.id}`}>
+                    <Button className="bg-white/20 hover:bg-white/30 backdrop-blur-md border-0 text-white shadow-lg">
+                      <Edit size={16} /> Edit Post
+                    </Button>
+                  </Link>
+               </div>
+             )}
+
              <span className="bg-nature-500 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-4 inline-block">{post.category}</span>
              <h1 className="text-4xl md:text-5xl font-serif font-bold mb-4 leading-tight">{post.title}</h1>
              <p className="text-xl text-stone-200 font-light max-w-3xl mb-6">{post.subtitle}</p>

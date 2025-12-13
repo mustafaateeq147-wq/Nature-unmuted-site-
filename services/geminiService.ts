@@ -6,6 +6,15 @@ const apiKey = process.env.API_KEY || '';
 // Initialize Gemini
 const ai = new GoogleGenAI({ apiKey });
 
+// Helper to clean JSON string from Markdown code blocks
+const cleanJsonString = (str: string) => {
+  if (!str) return '';
+  // Remove ```json at start and ``` at end, and generic ``` wrappers
+  let cleaned = str.replace(/^```json\s*/i, '').replace(/^```\s*/i, '');
+  cleaned = cleaned.replace(/\s*```$/, '');
+  return cleaned.trim();
+};
+
 export const generateSeoTags = async (postContent: string, postTitle: string): Promise<SeoData> => {
   if (!apiKey) {
     console.warn("No API Key provided for Gemini.");
@@ -47,7 +56,8 @@ export const generateSeoTags = async (postContent: string, postTitle: string): P
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as SeoData;
+      const cleanedText = cleanJsonString(response.text);
+      return JSON.parse(cleanedText) as SeoData;
     }
     
     throw new Error("No response text from Gemini");
@@ -106,27 +116,25 @@ export const generateFullPost = async (topic: string): Promise<{
     throw new Error("API Key is missing. Cannot generate content.");
   }
 
-  // 1. Generate Text Content
-  const textPrompt = `
-    You are an expert environmental blog writer for "Nature Unmuted".
-    Create a complete, high-quality blog post about the following topic: "${topic}".
-    
-    Return a JSON object with:
-    1. title: A catchy, SEO-friendly title.
-    2. subtitle: A compelling, short summary (max 2 sentences).
-    3. content: The full blog post in Markdown. Use H2 (##) for section headers, bullet points, and bold text. It should be educational, inspiring, and at least 400 words.
-    4. category: Choose exactly one: "Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change".
-    5. tags: Array of 4-6 relevant tags.
-    6. seo: Object with 'metaTitle', 'metaDescription', 'keywords'.
-    7. imageKeyword: A single descriptive sentence to generate a cover image (e.g. "A serene forest with sunlight streaming through trees").
-
-    Ensure the tone is professional yet passionate.
-  `;
-
   try {
-    const textResponse = await ai.models.generateContent({
+    // 1. Generate Metadata (Structure & SEO) - JSON
+    const metadataPrompt = `
+      You are an expert environmental blog writer for "Nature Unmuted".
+      Topic: "${topic}".
+      
+      Generate the structure and metadata for a blog post.
+      Return a JSON object with:
+      1. title: A catchy, SEO-friendly title.
+      2. subtitle: A compelling, short summary (max 2 sentences).
+      3. category: Choose exactly one: "Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change".
+      4. tags: Array of 4-6 relevant tags.
+      5. seo: Object with 'metaTitle', 'metaDescription', 'keywords'.
+      6. imageKeyword: A single descriptive sentence to generate a cover image (e.g. "A serene forest with sunlight streaming through trees").
+    `;
+
+    const metadataResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: textPrompt,
+        contents: metadataPrompt,
         config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -134,7 +142,6 @@ export const generateFullPost = async (topic: string): Promise<{
             properties: {
             title: { type: Type.STRING },
             subtitle: { type: Type.STRING },
-            content: { type: Type.STRING },
             category: { type: Type.STRING, enum: ["Oceans", "Forests", "Wildlife", "Sustainability", "Climate Change"] },
             tags: { type: Type.ARRAY, items: { type: Type.STRING } },
             imageKeyword: { type: Type.STRING },
@@ -146,28 +153,66 @@ export const generateFullPost = async (topic: string): Promise<{
                 keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
                 }
             }
-            }
+            },
+            required: ["title", "subtitle", "category", "tags", "imageKeyword", "seo"]
         }
         }
     });
 
-    if (!textResponse.text) {
-        throw new Error("Failed to generate post content text");
+    if (!metadataResponse.text) throw new Error("Failed to generate post metadata");
+    
+    const cleanedMetadataJson = cleanJsonString(metadataResponse.text);
+    let metadata;
+    try {
+        metadata = JSON.parse(cleanedMetadataJson);
+    } catch (e) {
+        console.error("Metadata JSON Parse Error:", cleanedMetadataJson);
+        throw new Error("Failed to parse metadata JSON.");
     }
 
-    const data = JSON.parse(textResponse.text);
+    // 2. Generate Content - Plain Text (Markdown)
+    // We do this separately to avoid JSON escaping issues with large text blocks
+    const contentPrompt = `
+      Write a complete, professional, and passionate environmental blog post in Markdown based on the following:
+      
+      Title: "${metadata.title}"
+      Subtitle: "${metadata.subtitle}"
+      Topic: "${topic}"
+      
+      Requirements:
+      - Use H2 (##) for section headers.
+      - Use bullet points and bold text where appropriate.
+      - Do NOT include the title at the top (it's handled separately).
+      - STRICTLY text content only. No images.
+      - Length: approx 500-700 words.
+    `;
 
-    // Ensure SEO object exists even if model returns incomplete data
-    const sanitizedSeo = data.seo || { 
-        metaTitle: data.title, 
-        metaDescription: data.subtitle || 'A post about ' + topic, 
+    const contentResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: contentPrompt,
+        // No responseMimeType means plain text/markdown
+    });
+
+    if (!contentResponse.text) throw new Error("Failed to generate post content");
+    const content = contentResponse.text;
+
+    // 3. Generate Image
+    const coverImage = await generateBlogImage(metadata.imageKeyword || topic);
+
+    // Ensure SEO object exists
+    const sanitizedSeo = metadata.seo || { 
+        metaTitle: metadata.title, 
+        metaDescription: metadata.subtitle || 'A post about ' + topic, 
         keywords: [] 
     };
 
-    // 2. Generate Image based on the keyword/description provided by the text model
-    const coverImage = await generateBlogImage(data.imageKeyword || topic);
+    return { 
+        ...metadata, 
+        content, 
+        seo: sanitizedSeo, 
+        coverImage 
+    };
 
-    return { ...data, seo: sanitizedSeo, coverImage };
   } catch (error) {
     console.error("Full post generation failed:", error);
     throw error;

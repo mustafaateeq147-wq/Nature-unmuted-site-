@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useBlog } from '../context/BlogContext';
 import { Button, Card, Input, TextArea, RichTextEditor, ImagePicker, MarkdownRenderer } from '../components/UI';
 import { Category, Post, SiteSettings } from '../types';
 import { generateSeoTags, generateFullPost } from '../services/geminiService';
 import { 
   Plus, Edit, Trash2, Settings, BarChart3, Save, 
-  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, X, Wand2
+  ArrowLeft, Sparkles, LayoutDashboard, FileText, Globe, Eye, PenTool, X, Wand2, CheckCircle, Circle,
+  ExternalLink, Copy, Check
 } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -60,8 +61,12 @@ export const Login: React.FC = () => {
 };
 
 export const AdminDashboard: React.FC = () => {
-  const { posts, deletePost } = useBlog();
+  const { posts, deletePost, updatePost } = useBlog();
   const navigate = useNavigate();
+
+  const toggleStatus = (post: Post) => {
+    updatePost({ ...post, isPublished: !post.isPublished });
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -81,7 +86,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="p-4 bg-emerald-200 dark:bg-emerald-800 rounded-full text-emerald-700 dark:text-emerald-100"><FileText size={24} /></div>
           <div>
             <p className="text-sm text-stone-500 dark:text-stone-400 font-medium">Published Posts</p>
-            <p className="text-3xl font-bold text-stone-800 dark:text-white">{posts.length}</p>
+            <p className="text-3xl font-bold text-stone-800 dark:text-white">{posts.filter(p => p.isPublished).length}</p>
           </div>
         </Card>
         <Card className="flex items-center gap-4 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 p-6">
@@ -104,40 +109,52 @@ export const AdminDashboard: React.FC = () => {
         <div className="p-6 border-b border-stone-200 dark:border-stone-700 flex justify-between items-center">
             <h2 className="font-bold text-lg text-stone-800 dark:text-white">Recent Posts</h2>
         </div>
-        <table className="w-full">
-          <thead className="bg-stone-50 dark:bg-stone-900 text-left">
-            <tr>
-              <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider">Title</th>
-              <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider hidden md:table-cell">Category</th>
-              <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider hidden md:table-cell">Date</th>
-              <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
-            {posts.map(post => (
-              <tr key={post.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
-                <td className="p-4">
-                    <p className="font-medium text-stone-800 dark:text-white">{post.title}</p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 md:hidden">{post.category} • {new Date(post.date).toLocaleDateString()}</p>
-                </td>
-                <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell">
-                  <span className="px-2 py-1 rounded-full bg-nature-100 dark:bg-nature-900 text-nature-700 dark:text-nature-300 text-xs font-bold">
-                    {post.category}
-                  </span>
-                </td>
-                <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell text-sm">{new Date(post.date).toLocaleDateString()}</td>
-                <td className="p-4 text-right space-x-2">
-                  <Button variant="ghost" className="p-2 inline-flex h-8 w-8" onClick={() => navigate(`/admin/editor/${post.id}`)} title="Edit">
-                    <Edit size={16} />
-                  </Button>
-                  <Button variant="ghost" className="p-2 inline-flex h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deletePost(post.id)} title="Delete">
-                    <Trash2 size={16} />
-                  </Button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-stone-50 dark:bg-stone-900 text-left">
+              <tr>
+                <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider">Title</th>
+                <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider hidden md:table-cell">Status</th>
+                <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider hidden md:table-cell">Category</th>
+                <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider hidden md:table-cell">Date</th>
+                <th className="p-4 text-xs font-bold uppercase text-stone-500 dark:text-stone-400 tracking-wider text-right">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
+              {posts.map(post => (
+                <tr key={post.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
+                  <td className="p-4">
+                      <p className="font-medium text-stone-800 dark:text-white">{post.title}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 md:hidden">{post.category} • {new Date(post.date).toLocaleDateString()}</p>
+                  </td>
+                  <td className="p-4 hidden md:table-cell">
+                    <button 
+                      onClick={() => toggleStatus(post)}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold border transition-all ${post.isPublished ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800' : 'bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-400'}`}
+                    >
+                      {post.isPublished ? <CheckCircle size={12} /> : <Circle size={12} />}
+                      {post.isPublished ? 'Published' : 'Draft'}
+                    </button>
+                  </td>
+                  <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell">
+                    <span className="px-2 py-1 rounded-full bg-nature-100 dark:bg-nature-900 text-nature-700 dark:text-nature-300 text-xs font-bold">
+                      {post.category}
+                    </span>
+                  </td>
+                  <td className="p-4 text-stone-600 dark:text-stone-400 hidden md:table-cell text-sm">{new Date(post.date).toLocaleDateString()}</td>
+                  <td className="p-4 text-right space-x-2">
+                    <Button variant="ghost" className="p-2 inline-flex h-8 w-8" onClick={() => navigate(`/admin/editor/${post.id}`)} title="Edit">
+                      <Edit size={16} />
+                    </Button>
+                    <Button variant="ghost" className="p-2 inline-flex h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => deletePost(post.id)} title="Delete">
+                      <Trash2 size={16} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -147,6 +164,7 @@ export const PostEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { posts, addPost, updatePost } = useBlog();
   const navigate = useNavigate();
+  const location = useLocation();
   const isEditing = !!id;
 
   const [formData, setFormData] = useState<Post>({
@@ -168,6 +186,8 @@ export const PostEditor: React.FC = () => {
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
   const [isGeneratingPost, setIsGeneratingPost] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [aiTopic, setAiTopic] = useState('');
   
   const [tagInput, setTagInput] = useState('');
@@ -178,7 +198,14 @@ export const PostEditor: React.FC = () => {
       const existingPost = posts.find(p => p.id === id);
       if (existingPost) setFormData(existingPost);
     }
-  }, [id, posts, isEditing]);
+  }, [id, isEditing]);
+
+  useEffect(() => {
+    if ((location.state as any)?.saved) {
+        setShowSaveSuccess(true);
+        // Clean state history so refresh doesn't trigger it? (Optional, skipping for simplicity)
+    }
+  }, [location]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -188,10 +215,19 @@ export const PostEditor: React.FC = () => {
     if (!formData.title) return alert("Title is required");
     if (isEditing) {
       updatePost(formData);
+      setShowSaveSuccess(true);
     } else {
       addPost(formData);
+      // Navigate to edit mode to prevent duplicate creations on subsequent saves
+      navigate(`/admin/editor/${formData.id}`, { replace: true, state: { saved: true } });
     }
-    navigate('/admin');
+  };
+
+  const copyPreviewLink = () => {
+    const url = `${window.location.origin}/#/post/${formData.id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleGenerateSeo = async () => {
@@ -244,6 +280,40 @@ export const PostEditor: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl relative">
+      {/* Success Modal / Banner */}
+      {showSaveSuccess && (
+        <div className="fixed bottom-6 right-6 z-[60] animate-slide-up">
+            <div className="bg-nature-700 text-white p-6 rounded-xl shadow-2xl max-w-sm border border-nature-600">
+                <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><CheckCircle className="text-nature-200" /> Post Saved!</h3>
+                    <button onClick={() => setShowSaveSuccess(false)} className="text-nature-200 hover:text-white"><X size={18} /></button>
+                </div>
+                <p className="text-nature-100 text-sm mb-4">Your changes have been successfully saved.</p>
+                <div className="bg-nature-800/50 p-3 rounded-lg mb-3">
+                    <p className="text-xs text-nature-300 font-bold uppercase tracking-wider mb-1">Preview Link</p>
+                    <div className="flex items-center gap-2">
+                        <code className="text-xs text-white truncate flex-grow block">
+                            {window.location.origin}/#/post/{formData.id}
+                        </code>
+                        <button onClick={copyPreviewLink} className="text-nature-200 hover:text-white" title="Copy Link">
+                            {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <a 
+                        href={`/#/post/${formData.id}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex-grow text-center text-sm bg-white text-nature-800 py-2 rounded-lg font-bold hover:bg-nature-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <ExternalLink size={14} /> Open Preview
+                    </a>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* AI Generation Modal */}
       {showAiModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -309,7 +379,7 @@ export const PostEditor: React.FC = () => {
                 </button>
             </div>
             <Button onClick={handleSave} className="bg-nature-600 hover:bg-nature-700 text-white">
-            <Save size={18} /> Save Post
+            <Save size={18} /> {isEditing ? 'Update Post' : 'Save'}
             </Button>
          </div>
       </div>
@@ -352,6 +422,20 @@ export const PostEditor: React.FC = () => {
             <Card>
                 <h3 className="font-bold mb-4 text-stone-700 dark:text-white">Publishing Details</h3>
                 <div className="flex flex-col gap-4">
+                
+                <div className="flex items-center gap-2 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg border border-stone-100 dark:border-stone-700">
+                    <input 
+                      type="checkbox" 
+                      id="isPublished"
+                      checked={formData.isPublished}
+                      onChange={(e) => setFormData({...formData, isPublished: e.target.checked})}
+                      className="w-4 h-4 text-nature-600 rounded focus:ring-nature-500 cursor-pointer"
+                    />
+                    <label htmlFor="isPublished" className="text-sm font-semibold text-stone-700 dark:text-stone-300 cursor-pointer select-none">
+                       {formData.isPublished ? 'Published & Visible' : 'Save as Draft'}
+                    </label>
+                </div>
+
                 <div className="flex flex-col gap-1">
                     <label className="text-sm font-semibold text-stone-600 dark:text-stone-300">Category</label>
                     <select 
